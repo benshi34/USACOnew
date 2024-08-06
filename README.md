@@ -29,7 +29,7 @@ and seems less buggy than `export OPENAI_API_KEY`.
 
 ## Judge sandbox directories
 
-Local evaluation requires absolute paths — please update the global path constants at the top of the files `USACOBench/evaluation/judges/usaco_judge.py` and `USACOBench/evaluation/judges/usaco_batch_judge.py`. A good default is to set them to `{parent of this repository}/USACO/{copy rest of path}`.
+Local evaluation requires absolute paths — please update the global path constants at the top of the files `USACOBench/evaluation/judges/usaco_judge.py`, `USACOBench/evaluation/judges/usaco_batch_judge.py`, `USACOBench/tools/sandbox.py`, and `USACOBench/evaluation/judges/usaco_utils.py`. A good default is to set them to `{parent of this repository}/USACO/{copy rest of path}`.
 
 Note that as more solutions are generated, the directory may become large. Optionally to save space, you may also delete solutions or pickle files you no longer want at any time, as long as judging is not currently running.
 
@@ -58,14 +58,14 @@ We evaluate Python locally using `exec`; the execution code is adapted from Open
 
 To evaluate default solve on a given a model endpoint (only GPT and Claude API endpoints are automatically supported)
 ```
-python run_usaco.py --model-name gpt-3.5-turbo
+python run_usaco.py -m gpt-3.5-turbo
 ```
 To replicate open source models, create a model_fn following formatting in `USACOBench/models/gpts.py`. 
 
 
 Enabling inference methods in the paper such as Episodic Retrieval, Semantic Retrieval, and Reflexion is as simple as passing in the corresponding flags. For example, to run a combination of Episodic and Semantic Retrieval, run
 ```
-python run_usaco.py --model-name gpt-3.5-turbo -s -e
+python run_usaco.py -m gpt-3.5-turbo -s -e
 ```
 
 ## Reducing Memory Usage
