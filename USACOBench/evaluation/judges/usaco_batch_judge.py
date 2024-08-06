@@ -20,8 +20,8 @@ Result = Dict[str, str]
 ResultSet = List[Result]
 
 # [README] modify where generated solutions and subsequent predictions are stored
-USACO_PREDICTIONS_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/judge_sandbox/predictions/usaco/{}_{}.pred'
-USACO_SOLUTIONS_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/judge_sandbox/solutions/usaco/{}_{}.py'
+USACO_PREDICTIONS_PATH = '/home/benshi34/USACOnew/judge_sandbox/predictions/usaco/{}_{}.pred'
+USACO_SOLUTIONS_PATH = '/home/benshi34/USACOnew/judge_sandbox/solutions/usaco/{}_{}.py'
 # construct judge sandbox directories if they don't exist
 Path('judge_sandbox/solutions/usaco').mkdir(parents=True, exist_ok=True)
 Path('judge_sandbox/predictions/usaco').mkdir(parents=True, exist_ok=True)

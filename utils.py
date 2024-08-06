@@ -8,6 +8,7 @@ from USACOBench.prompts import solve_prompt_fn, retrieval_prompt_fn, reflexion_p
 from rank_bm25 import BM25Okapi
 from evaluate import evaluate_model
 from functools import partial
+import random
 
 Problem = Dict[Any, Any]
 Solution = Dict[str, Union[str, None]]
@@ -131,7 +132,7 @@ def get_difficulty_performances(full_results, problem_dict, k=1):
 ####################################################################################################
 
 # p is the number of problems retrieved
-def generate_episodic_retrieval_queries(p, problem_dict, solution_sets):
+def generate_episodic_retrieval_queries(p, problem_dict, solution_sets, use_text=True):
     corpus = [problem_dict[problem_id]['description'] + '\nSolution: \n' + problem_dict[problem_id]['solution_english'] + '\nSolution Code: \n' + problem_dict[problem_id]['solution_python3'] for problem_id in problem_dict.keys()]
     solutions = solution_sets
     query_texts = []
@@ -140,7 +141,10 @@ def generate_episodic_retrieval_queries(p, problem_dict, solution_sets):
         solution_text = solution[0]['solution']
         problem_id = solution[0]['problem_id']
         if problem_id in problem_dict.keys():
-            query_texts.append(problem_dict[problem_id]['description'] + '\n' + solution_text)
+            if use_text:
+                query_texts.append(problem_dict[problem_id]['description'] + '\n' + solution_text)
+            else:
+                query_texts.append(problem_dict[problem_id]['description'] + '\n' + solution_text)
             problem_ids.append(problem_id)
 
     sim_prob_queries_new_code = []
@@ -167,6 +171,55 @@ def generate_episodic_retrieval_queries(p, problem_dict, solution_sets):
                 assert 1 == 2
         sim_prob_queries_new_code.append({'problem_id': problem_id, 'retrieval_text': '[BEGIN SIMILAR PROBLEMS]\n' + similar_problem_text + '\n[END SIMILAR PROBLEMS]\n', 'retrieval_problem_ids': similar_problem_ids, 'problem_description': problem_dict[problem_id]['description']})
     save_json(sim_prob_queries_new_code, f'queries_firstsolve_{p}problem_episodic')
+    return sim_prob_queries_new_code
+
+def generate_random_retrieval_queries(p, problem_dict):
+    problem_ids = list(problem_dict.keys())
+    corpus = [problem_dict[problem_id]['description'] + '\nSolution: \n' + problem_dict[problem_id]['solution_english'] + '\nSolution Code: \n' + problem_dict[problem_id]['solution_python3'] for problem_id in problem_ids]
+    sim_prob_queries_new_code = []
+    for i, problem_id in enumerate(list(problem_dict.keys())):
+        curr_description = problem_dict[problem_id]['description'] + '\nSolution: \n' + problem_dict[problem_id]['solution_english'] + '\nSolution Code: \n' + problem_dict[problem_id]['solution_python3']
+        duplicated = corpus[:]
+        duplicated.remove(curr_description)
+
+        r_indices = random.sample(range(len(duplicated)), p)
+        similar_problem_texts = [duplicated[indx] for indx in r_indices]
+        similar_problem_text = ""
+        words = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
+        similar_problem_ids = []
+        for i, text in enumerate(similar_problem_texts):
+            similar_problem_text += f"\n\n {words[i]} problem and solution \n\n" + text 
+            similar_problem_ids.append(search(text, corpus, problem_ids))
+
+        for val in similar_problem_ids:
+            if val == None:
+                print(similar_problem_texts)
+                assert 1 == 2
+        sim_prob_queries_new_code.append({'problem_id': problem_id, 'retrieval_text': '[BEGIN SIMILAR PROBLEMS]\n' + similar_problem_text + '\n[END SIMILAR PROBLEMS]\n', 'retrieval_problem_ids': similar_problem_ids, 'problem_description': problem_dict[problem_id]['description']})
+    save_json(sim_prob_queries_new_code, f'queries_random_{p}problem_episodic')
+    return sim_prob_queries_new_code
+
+def generate_constant_retrieval_queries(p, problem_dict):
+    problem_ids = list(problem_dict.keys())
+    corpus = [problem_dict[problem_id]['description'] + '\nSolution: \n' + problem_dict[problem_id]['solution_english'] + '\nSolution Code: \n' + problem_dict[problem_id]['solution_python3'] for problem_id in problem_ids]
+    sim_prob_queries_new_code = []
+    r_indices = random.sample(range(len(corpus)), p)
+    similar_problem_texts = [corpus[indx] for indx in r_indices]
+
+    for i, problem_id in enumerate(list(problem_dict.keys())):       
+        similar_problem_text = ""
+        words = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
+        similar_problem_ids = []
+        for i, text in enumerate(similar_problem_texts):
+            similar_problem_text += f"\n\n {words[i]} problem and solution \n\n" + text 
+            similar_problem_ids.append(search(text, corpus, problem_ids))
+
+        for val in similar_problem_ids:
+            if val == None:
+                print(similar_problem_texts)
+                assert 1 == 2
+        sim_prob_queries_new_code.append({'problem_id': problem_id, 'retrieval_text': '[BEGIN SIMILAR PROBLEMS]\n' + similar_problem_text + '\n[END SIMILAR PROBLEMS]\n', 'retrieval_problem_ids': similar_problem_ids, 'problem_description': problem_dict[problem_id]['description']})
+    save_json(sim_prob_queries_new_code, f'queries_constant_{p}problem_episodic')
     return sim_prob_queries_new_code
 
 def generate_semantic_retrieval_queries(problem_dict, solution_sets, model_name):
@@ -287,13 +340,13 @@ def run_solve(model_fn, model_name, problem_dict, attempts, return_queries=False
     for problem_id in problem_dict.keys():
         queries.append({'problem_id': problem_id, 'problem_description': problem_dict[problem_id]['description']})
 
-    rdict, sdict, rs, ss = evaluate_model(model_fn, solve_prompt_fn, queries=queries, verbose=True, attempts=attempts, problem_ids=list(problem_dict.keys())[:2])
+    rdict, sdict, rs, ss = evaluate_model(model_fn, solve_prompt_fn, queries=queries, verbose=True, attempts=attempts, problem_ids=list(problem_dict.keys()))
     save_json([rdict, sdict, rs, ss], f'results/results_{model_name}_solve_{attempts}attempts')
     return (rdict, sdict, rs, ss) if not return_queries else (rdict, sdict, rs, ss, queries)
 
-def run_retrieval(model_fn, model_name, problem_dict, attempts, solution_sets, num_retrieved, retrieval_type, return_queries=False):
+def run_retrieval(model_fn, model_name, problem_dict, attempts, solution_sets, num_retrieved, retrieval_type, return_queries=False, use_text=True):
     if retrieval_type == RetrievalType.EPISODIC:
-        queries = generate_episodic_retrieval_queries(num_retrieved, problem_dict, solution_sets)
+        queries = generate_episodic_retrieval_queries(num_retrieved, problem_dict, solution_sets, use_text=use_text)
     elif retrieval_type == RetrievalType.SEMANTIC:
         queries = generate_semantic_retrieval_queries(problem_dict, solution_sets, model_name)
     else:

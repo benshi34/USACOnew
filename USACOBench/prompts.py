@@ -61,3 +61,13 @@ No outside libraries are allowed.
 {query['problem_description'] }
 [END PROBLEM]
 """
+
+def solve_detailed_prompt_fn(query):
+    return f"""Please reply with a Python 3 solution to the below problem. First, conceptualize a solution, detailing the steps and your thought process to approaching the problem. Structure your output like a textbook solution to a problem. Your solution will be used to educate others, so make sure to be sufficiently detailed. 
+    Afterwards, generate code that will solve the problem. Do not generate pseudocode. Make sure to wrap your code in '```python' and '```' Markdown delimiters.
+No outside libraries are allowed.
+
+[BEGIN PROBLEM]
+{query['problem_description'] }
+[END PROBLEM]
+"""

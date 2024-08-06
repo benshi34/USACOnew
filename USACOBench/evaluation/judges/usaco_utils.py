@@ -16,10 +16,10 @@ from USACOBench.evaluation.result_type import ResultType
 Result = Dict[str, str]
 
 # [FILL IN: NEED PATH TO TESTS]
-USACO_TEST_IN_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/data/datasets/usaco_v3/tests/{}/{}.in'
-USACO_TEST_IN_ALT_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/data/datasets/usaco_v3/tests/{}/I.{}'
-USACO_TEST_OUT_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/data/datasets/usaco_v3/tests/{}/{}.out'
-USACO_TEST_OUT_ALT_PATH = '/n/fs/nlp-qbshi/p-in-memory-learning/data/datasets/usaco_v3/tests/{}/O.{}'
+USACO_TEST_IN_PATH = '/home/benshi34/USACOnew/data/datasets/usaco_v3/tests/{}/{}.in'
+USACO_TEST_IN_ALT_PATH = '/home/benshi34/USACOnew/data/datasets/usaco_v3/tests/{}/I.{}'
+USACO_TEST_OUT_PATH = '/home/benshi34/USACOnew/data/datasets/usaco_v3/tests/{}/{}.out'
+USACO_TEST_OUT_ALT_PATH = '/home/benshi34/USACOnew/data/datasets/usaco_v3/tests/{}/O.{}'
 
 # USACO_TEST_IN_PATH = '/n/fs/nlp-iml/p-in-memory-learning2/data/datasets/usaco/tests/{}/{}.in'
 # USACO_TEST_IN_ALT_PATH = '/n/fs/nlp-iml/p-in-memory-learning2/data/datasets/usaco/tests/{}/I.{}'
@@ -159,8 +159,8 @@ def check_correctness(program: str, test_num: int, timeout: float, memory_limit:
     # print(pred == output)
     # print(result)
     if "passed" in result[0] and pred != output:
-        # result[0] = f"wrong answer on test {test_num}"
-        result[0] =  f"wrong answer.\nInput:\n{inp}\nPredicted output:\n{pred}\nCorrect output:\n{output}"
+        result[0] = f"wrong answer on test {test_num}"
+        # result[0] =  f"wrong answer.\nInput:\n{inp}\nPredicted output:\n{pred}\nCorrect output:\n{output}"
     
     os.remove(pred_file)
 

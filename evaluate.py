@@ -62,51 +62,53 @@ def evaluate_model(model_fn: Callable,
     model_fn = partial(model_fn, verbose=verbose)
     judge_fn = partial(judge_fn_solve, verbose=verbose)
 
-    prompts = [prompt_fn(query) for prompt_fn, query in zip(prompt_fns, queries)] * attempts
-    if verbose:
-        print('Generating...')
-        start_time = time.time()
-    responses = model_fn(prompts)
-    if verbose:
-        print('Finished generation, took {} seconds'.format(time.time() - start_time))
-
-    if verbose:
-        print('Judging...')
-        start_time = time.time()
-    results = judge_fn(responses, queries * attempts)
-    if verbose:
-        print('Finished judging, took {} seconds'.format(time.time() - start_time))
-
-    # nicer result formats
     rdict = {}
-    for result in results:
-        problem_id = result['problem_id']
-        if problem_id not in rdict:
-            rdict[problem_id] = []
-        rdict[problem_id].append(result)
-    rs = list(rdict.values())
-
-    # nicer solution formats
-    # note: this sdict / ss includes the result for easier qualitative eval, so may be slightly bulkier
-        # no ground truth, e.g. code
     sdict = {}
-    for solution, prompt, query in zip(responses, prompts, queries):
-        problem_id = query['problem_id']
-        matching_result = None
-        for result in results:
-            if result['problem_id'] == problem_id:
-                matching_result = result
-                break
+    for i in range(attempts):
+        prompts = [prompt_fn(query) for prompt_fn, query in zip(prompt_fns, queries)]
+        if verbose:
+            print('Generating...')
+            start_time = time.time()
+        responses = model_fn(prompts)
+        if verbose:
+            print('Finished generation attempt {}, took {} seconds'.format(i, time.time() - start_time))
 
-        if problem_id not in sdict:
-            sdict[problem_id] = []
-        sdict[problem_id].append({
-            'solution': solution,
-            'solution_code': get_code_from_solution(solution),
-            'result': matching_result,
-            'problem_id': problem_id,
-            'prompt': prompt,
-        })
+        if verbose:
+            print('Judging...')
+            start_time = time.time()
+        results = judge_fn(responses, queries * attempts)
+        if verbose:
+            print('Finished judging attempt {}, took {} seconds'.format(i, time.time() - start_time))
+
+        # nicer result formats
+        for result in results:
+            problem_id = result['problem_id']
+            if problem_id not in rdict:
+                rdict[problem_id] = []
+            rdict[problem_id].append(result)
+
+        # nicer solution formats
+        # note: this sdict / ss includes the result for easier qualitative eval, so may be slightly bulkier
+            # no ground truth, e.g. code
+        for solution, prompt, query in zip(responses, prompts, queries):
+            problem_id = query['problem_id']
+            matching_result = None
+            for result in results:
+                if result['problem_id'] == problem_id:
+                    matching_result = result
+                    break
+
+            if problem_id not in sdict:
+                sdict[problem_id] = []
+            sdict[problem_id].append({
+                'solution': solution,
+                'solution_code': get_code_from_solution(solution),
+                'result': matching_result,
+                'problem_id': problem_id,
+                'prompt': prompt,
+            })
+    
+    rs = list(rdict.values())
     ss = list(sdict.values())
     
     return rdict, sdict, rs, ss

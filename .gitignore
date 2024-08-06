@@ -9,6 +9,8 @@ lib/
 share/
 __pycache__/
 results/
+results_trashed/
+queries/
 
 **.slurm
 **.sh

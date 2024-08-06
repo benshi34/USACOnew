@@ -12,8 +12,8 @@ import signal
 import tempfile
 import dill
 
-DEFAULT_SANDBOX_DIR = '/n/fs/nlp-iml/p-in-memory-learning2/code_sandbox/sandbox_env.db'
-DEFAULT_OUT_FILE = '/n/fs/nlp-iml/p-in-memory-learning2/code_sandbox/sandbox_out.out'
+DEFAULT_SANDBOX_DIR = '/home/benshi34/USACOnew/code_sandbox/sandbox_env.db'
+DEFAULT_OUT_FILE = '/home/benshi34/USACOnew/code_sandbox/sandbox_out.out'
 
 if not os.path.isfile(DEFAULT_SANDBOX_DIR):
     # init empty environment if not available
