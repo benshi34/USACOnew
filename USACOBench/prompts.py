@@ -4,6 +4,7 @@ class RetrievalType(int, Enum):
     EPISODIC = 1
     SEMANTIC = 2
     EPISODIC_SEMANTIC = 3
+    OPTIMAL = 4
 
 def retrieval_prompt_fn(query, retrieval_type=RetrievalType.EPISODIC):
     if retrieval_type == RetrievalType.EPISODIC:
@@ -12,11 +13,13 @@ def retrieval_prompt_fn(query, retrieval_type=RetrievalType.EPISODIC):
         descriptor = "a textbook chapter relevant to the given problem"
     elif retrieval_type == RetrievalType.EPISODIC_SEMANTIC:
         descriptor = "multiple somewhat similar problems and solutions, as well as a textbook chapter relevant to the given problem"
+    elif retrieval_type == RetrievalType.OPTIMAL:
+        descriptor = "hints from a guide on how to solve the problem"
     else:
         raise Exception("Retrieval type not supported.")
     return f"""Please reply with a Python 3 solution to the below problem. Make sure to wrap your code in '```python' and '```' Markdown
 delimiters, and include exactly one block of code with the entire solution
-(in the final code step). You will also be given {descriptor}. Feel free to use the given information to aid your problem solving process if necessary.
+(in the final code step). You will also be given retrieved text, which represents {descriptor}. Feel free to use the given information to aid your problem solving process.
 Reason through the problem and:
 1. Restate the problem in plain English
 2. Conceptualize a solution first in plain English
@@ -24,7 +27,9 @@ Reason through the problem and:
 4. Output the final Python solution with your solution steps in comments.
 No outside libraries are allowed.
 
+[BEGIN RETRIEVED TEXT]
 {query['retrieval_text']}
+[END RETRIEVED TEXT]
 
 Now it's your turn. Here is the problem you are to solve:
 [BEGIN PROBLEM]

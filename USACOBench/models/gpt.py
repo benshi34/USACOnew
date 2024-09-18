@@ -11,7 +11,6 @@ from typing import Any, List, Dict, Union
 from tqdm.asyncio import tqdm_asyncio
 import math
 import anthropic
-from openlimit import ChatRateLimiter
 from json import JSONDecodeError
 import backoff
 
@@ -265,10 +264,10 @@ async def generate_answer_anthropic(message, client, model, max_tokens):
     )
     return response
     
-def gpt(prompt, model="gpt-4", temperature=0.7, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
+def gpt(prompt, model="gpt-4", temperature=0.4, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
     return gpts([prompt] * n, model=model, temperature=temperature, max_tokens=max_tokens, stop=stop, **kwargs)[0]
 
-def gpts(prompts, model="gpt-4", temperature=0.7, max_tokens=2000, stop=None,
+def gpts(prompts, model="gpt-4", temperature=0.4, max_tokens=2000, stop=None,
          system_prompt: str = None,
          **kwargs) -> list:
     '''
@@ -281,13 +280,13 @@ def gpts(prompts, model="gpt-4", temperature=0.7, max_tokens=2000, stop=None,
         messages_list = [[{"role": "user", "content": prompt}] for prompt in prompts]
     return chatgpts(messages_list, model=model, temperature=temperature, max_tokens=max_tokens, stop=stop, **kwargs)
 
-def chatgpt(messages, model="gpt-4", temperature=0.7, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
+def chatgpt(messages, model="gpt-4", temperature=0.4, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
     return chatgpts([messages] * n, model=model, temperature=temperature, max_tokens=max_tokens, stop=stop, **kwargs)[0]
 
-def chatgpt_raw(messages, model="gpt-4", temperature=0.7, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
+def chatgpt_raw(messages, model="gpt-4", temperature=0.4, max_tokens=2000, n=1, stop=None, **kwargs) -> list:
     return chatgpts_raw([messages] * n, model=model, temperature=temperature, max_tokens=max_tokens, stop=stop, **kwargs)[0]
 
-def chatgpts(messages_list, model="gpt-4", temperature=0.7, max_tokens=2000, stop=None, max_messages=200, **kwargs) -> list:
+def chatgpts(messages_list, model="gpt-4", temperature=0.4, max_tokens=2000, stop=None, max_messages=200, **kwargs) -> list:
     texts = []
     for i in range(0, len(messages_list), max_messages):
         responses = asyncio.run(generate_from_openai_chat_completion(model=model, messages_list=messages_list[i: i + max_messages], temperature=temperature, max_tokens=max_tokens, top_p=1, stop=stop, **kwargs))
@@ -310,7 +309,7 @@ def chatgpts_raw(messages_list, model="gpt-4", temperature=0.7, max_tokens=2000,
         # prompt_tokens[model] += sum(x["usage"]["prompt_tokens"] for x in responses if "usage" in x and "prompt_tokens" in x["usage"])
     return responses_all
 
-def claude(prompts, model="claude-3-sonnet-20240229", temperature=0.7, max_tokens=3000, stop=None, max_messages=200, system_prompt=None, **kwargs) -> list:
+def claude(prompts, model="claude-3-sonnet-20240229", temperature=0.4, max_tokens=3000, stop=None, max_messages=200, system_prompt=None, **kwargs) -> list:
     texts = []
     if system_prompt is not None:
         messages_list = [[{'role': 'system', 'content': system_prompt},
