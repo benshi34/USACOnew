@@ -13,6 +13,23 @@ CORS(app)
 
 problem_dict = load_json('data/datasets/usaco_subset307_dict')
 
+@app.route('/set-leetcode-auth', methods=['POST'])
+def set_leetcode_auth():
+    data = request.json
+    leetcode_cookie = data.get('leetcode_cookie')
+    leetcode_csrf_token = data.get('leetcode_csrf_token')
+
+    if not leetcode_cookie or not leetcode_csrf_token:
+        return jsonify({'error': 'Missing cookie or CSRF token'}), 400
+
+    print(f"Received LeetCode cookie: {leetcode_cookie}")
+    print(f"Received LeetCode CSRF token: {leetcode_csrf_token}")
+
+    # In a real application, you might want to store these in a secure way
+    # For example, in an encrypted database or a secure key-value store
+    return jsonify({'message': 'LeetCode authentication info received successfully'}), 200
+
+
 @app.route('/execute', methods=['POST'])
 def execute_code():
     data = request.json
