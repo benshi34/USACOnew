@@ -337,7 +337,7 @@ def generate_response():
     data = request.json
     messages = data['messages']
     model = data['model']
-    api_key = data['apiKey']
+    api_key = os.environ['OPENAI_API_KEY']
 
     # Create a new client instance for each request
     client = OpenAI(api_key=api_key)
