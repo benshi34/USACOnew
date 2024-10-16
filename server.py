@@ -3,7 +3,7 @@ load_dotenv()
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from USACOBench.evaluation.judges.usaco_judge import USACOJudge
+# from USACOBench.evaluation.judges.usaco_judge import USACOJudge
 from USACOBench.evaluation.judges.leetcode_judge import LeetCodeJudge
 from utils import load_json
 from USACOBench.evaluation import ResultType
@@ -11,7 +11,7 @@ from USACOBench.evaluation import ResultType
 app = Flask(__name__)
 CORS(app)
 
-problem_dict = load_json('data/datasets/usaco_subset307_dict')
+# problem_dict = load_json('data/datasets/usaco_subset307_dict')
 
 @app.route('/set-leetcode-auth', methods=['POST'])
 def set_leetcode_auth():
@@ -45,16 +45,17 @@ def execute_code():
         code = code.strip().replace('```Python', "").replace('```', "").replace('```python', "")
         assert code[0] != '`' and code[-1] != '`'
         if platform == 'usaco':
-            assert problem_id in problem_dict
+            # assert problem_id in problem_dict
+            return jsonify({'output': 'USACO not supported at the moment.', 'passed': False})
 
-        if platform == 'usaco':
-            judge = USACOJudge()
-            result = judge._judge(problem_dict[problem_id], code, save_solution=False, mode='eval_all')
+        # if platform == 'usaco':
+        #     judge = USACOJudge()
+        #     result = judge._judge(problem_dict[problem_id], code, save_solution=False, mode='eval_all')
         elif platform == 'leetcode':
             judge = LeetCodeJudge()
             print(code)
             result = judge._leetcode_judge(code, problem_id)
-
+        
         if result['result_type'] == ResultType.UNKNOWN:
             output = "Error occurred during evaluation."
             passed = False
