@@ -14,6 +14,7 @@ import dotenv
 import gym
 import leetcode
 from tqdm import tqdm
+from openai import OpenAI
 import random
 import numpy as np
 import leetcode.auth
@@ -331,6 +332,36 @@ class LeetCodeJudge(Judge):
         }
 
 # problem_dict = load_json('data/datasets/usaco_subset307_dict')
+@app.route('/generate', methods=['POST'])
+def generate_response():
+    data = request.json
+    messages = data['messages']
+    model = data['model']
+    api_key = data['apiKey']
+
+    # Create a new client instance for each request
+    client = OpenAI(api_key=api_key)
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant for coding problems."},
+                *messages
+            ]
+        )
+        
+        ai_message = response.choices[0].message.content
+        return jsonify({"message": ai_message}), 200
+    
+    except Exception as e:
+        error_message = str(e)
+        if "Incorrect API key provided" in error_message:
+            return jsonify({"error": "Invalid API key"}), 401
+        elif "Rate limit reached" in error_message:
+            return jsonify({"error": "Rate limit exceeded"}), 429
+        else:
+            return jsonify({"error": error_message}), 500
 
 @app.route('/set-leetcode-auth', methods=['POST'])
 def set_leetcode_auth():
