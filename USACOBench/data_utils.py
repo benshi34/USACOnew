@@ -3,6 +3,14 @@ import datasets
 import random
 import json
 from typing import List, Dict, Any, Union
+import html2text
+import random
+import re
+import leetcode
+import ast
+import json
+from bs4 import BeautifulSoup
+import os
 
 Problem = Dict[Any, Any]
 
@@ -97,3 +105,75 @@ def sample_from_dataset(dataset: datasets.Dataset,
                          num_samples) -> datasets.Dataset:
     assert num_samples <= len(dataset), 'num samples {} is more than length of dataset {}'.format(num_samples, len(dataset))
     return dataset.select(random.sample(range(len(dataset)), num_samples))
+
+def load_leetcode_problem(question_slugs: List[str], api_instance) -> List[str]:
+    return [{'problem_id': question_slug, 'description': fetch_problem(question_slug, api_instance)} for question_slug in question_slugs]
+
+def load_leetcode_problem_dict(problem_set):
+    res = dict()
+    for item in problem_set: 
+        res[item['problem_id']] = item['description']
+    return res 
+
+def get_info(question_slug: str, api_instance):
+    """
+    Retrieves the metadata of the question with the given slug
+    """
+    graphql_request = leetcode.GraphqlQuery(
+    query="""
+                query getQuestionDetail($titleSlug: String!) {
+                question(titleSlug: $titleSlug) {
+                    codeSnippets {
+                        lang
+                        langSlug
+                        code
+                        __typename
+                    }
+                    difficulty
+                    content
+                    title 
+                    hasSolution
+                }
+                }
+            """,
+            variables={"titleSlug": question_slug},
+            operation_name="getQuestionDetail",
+)
+    response = ast.literal_eval(str(api_instance.graphql_post(body=graphql_request)))
+    data = response['data']['question']
+    return data
+
+# Leetcode GraphQL Fetch Methods: 
+def fetch_problem(question, api_instance):
+    h = html2text.HTML2Text()
+    h.ignore_links = True
+    h.ignore_images = True
+    h.ignore_emphasis = True  
+    info = get_info(question, api_instance)
+    snippets = info['code_snippets']
+    target_snippet = None
+    for snippet in snippets:
+        if snippet['lang'].lower() == 'python3':
+            target_snippet = snippet['code']
+    content = BeautifulSoup(info['content'], features='html.parser')
+    text_content = h.handle(str(content))
+    text_content = "\n".join(line.lstrip() for line in text_content.split("\n"))
+    text_content = re.sub('\n\n+', '\n\n', text_content)
+    text_content = text_content.strip().strip('\n')
+    return f"{text_content}\nHere is the function declaration that you are to fill in.\n{target_snippet}"
+
+def get_api_instance():
+    """
+    Get the leetcode api instance
+    """
+    configuration = leetcode.Configuration()
+    # From Dev Tools/Application/Cookies/LEETCODE_SESSION
+    leetcode_session = os.environ["LEETCODE_SESSION"]
+    csrf_token = os.environ['CSRF_TOKEN']
+    configuration.api_key["x-csrftoken"] = csrf_token
+    configuration.api_key["csrftoken"] = csrf_token
+    configuration.api_key["LEETCODE_SESSION"] = leetcode_session
+    configuration.api_key["Referer"] = "https://leetcode.com"
+    configuration.debug = False
+    api_instance = leetcode.DefaultApi(leetcode.ApiClient(configuration))
+    return api_instance
