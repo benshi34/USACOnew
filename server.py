@@ -15,6 +15,7 @@ import gym
 import leetcode
 from tqdm import tqdm
 from openai import OpenAI
+import anthropic
 import random
 import numpy as np
 import leetcode.auth
@@ -22,6 +23,13 @@ import os
 import time
 from datetime import datetime
 from abc import ABC
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import json
+import io
+from datetime import datetime
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -337,22 +345,28 @@ def generate_response():
     data = request.json
     messages = data['messages']
     model = data['model']
-    api_key = os.environ['OPENAI_API_KEY']
+    openai_api_key = os.environ['OPENAI_API_KEY']
+    anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
 
-    # Create a new client instance for each request
-    client = OpenAI(api_key=api_key)
-
+    # Routing to the correct model
     try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a helpful AI assistant for coding problems."},
-                *messages
-            ]
-        )
-        
-        ai_message = response.choices[0].message.content
-        return jsonify({"message": ai_message}), 200
+        if 'gpt' in model:
+            # Create a new client instance for each request
+            client = OpenAI(api_key=openai_api_key)
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages
+            )
+            ai_message = response.choices[0].message.content
+            return jsonify({"message": ai_message}), 200
+        elif 'claude' in model:
+            ai_message = anthropic.Anthropic(api_key=anthropic_api_key).messages.create(
+                model=model,
+                messages=messages
+            )
+            return jsonify({"message": ai_message}), 200
+        else: 
+            return jsonify({"message": 'Model not supported.'}), 200
     
     except Exception as e:
         error_message = str(e)
@@ -429,6 +443,90 @@ def execute_code():
 @app.route('/test', methods=['GET'])
 def test():
     return jsonify({'message': 'Server is running!'})
+
+# Initialize Google Drive API
+def get_drive_service():
+    SCOPES = ['https://www.googleapis.com/auth/drive.file']
+    
+    # Create credentials dict from environment variable
+    service_account_info = json.loads(os.getenv('GOOGLE_SERVICE_ACCOUNT'))
+    
+    credentials = service_account.Credentials.from_service_account_info(
+        service_account_info,
+        scopes=SCOPES
+    )
+    
+    return build('drive', 'v3', credentials=credentials)
+
+@app.route('/upload-chat', methods=['POST'])
+def upload_chat():
+    try:
+        # Get data from request
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        required_fields = ['userId', 'problemId', 'modelId', 'timestamp', 'messages']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Create filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{data['userId']}_{data['problemId']}_{data['modelId']}_{timestamp}.json"
+
+        # Initialize Drive API
+        drive_service = get_drive_service()
+
+        # Prepare file metadata
+        file_metadata = {
+            'name': filename,
+            'parents': [os.environ.get('GOOGLE_DRIVE_FOLDER_ID')]  # Your folder ID
+        }
+
+        # Convert data to JSON string
+        file_content = json.dumps({
+            'userId': data['userId'],
+            'problemId': data['problemId'],
+            'modelId': data['modelId'],
+            'timestamp': data['timestamp'],
+            'messages': data['messages']
+        }, indent=2)
+
+        # Create file stream
+        file_stream = io.BytesIO(file_content.encode())
+        media = MediaIoBaseUpload(
+            file_stream,
+            mimetype='application/json',
+            resumable=True
+        )
+
+        # Upload file to Drive
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+
+        # Set file permissions to anyone with link can view
+        drive_service.permissions().create(
+            fileId=file['id'],
+            body={
+                'role': 'reader',
+                'type': 'anyone'
+            }
+        ).execute()
+
+        return jsonify({
+            'success': True,
+            'drive_url': file['webViewLink']
+        })
+
+    except Exception as e:
+        print(f"Error uploading to Drive: {str(e)}")
+        return jsonify({
+            'error': f'Failed to upload: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
