@@ -30,6 +30,7 @@ import json
 import io
 from datetime import datetime
 import os
+from prompts import abstractify_prompt_fn
 
 app = Flask(__name__)
 CORS(app)
@@ -41,6 +42,9 @@ Solution = Dict[str, Union[str, None]]
 SolutionSet = List[Solution]
 Result = Dict[str, str]
 ResultSet = List[Result]
+
+openai_api_key = os.environ['OPENAI_API_KEY']
+anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
 
 class ResultType(int, Enum):
     ACCEPTED              = 1
@@ -338,17 +342,9 @@ class LeetCodeJudge(Judge):
             'status': status,
             'judge_output': submission_result
         }
+    
 
-# problem_dict = load_json('data/datasets/usaco_subset307_dict')
-@app.route('/generate', methods=['POST'])
-def generate_response():
-    data = request.json
-    messages = data['messages']
-    model = data['model']
-    openai_api_key = os.environ['OPENAI_API_KEY']
-    anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
-
-    # Routing to the correct model
+def generate(messages, model):
     try:
         if 'gpt' in model:
             # Create a new client instance for each request
@@ -377,21 +373,25 @@ def generate_response():
         else:
             return jsonify({"error": error_message}), 500
 
-@app.route('/set-leetcode-auth', methods=['POST'])
-def set_leetcode_auth():
+
+# problem_dict = load_json('data/datasets/usaco_subset307_dict')
+@app.route('/generate', methods=['POST'])
+def generate_response():
     data = request.json
-    leetcode_cookie = data.get('leetcode_cookie')
-    leetcode_csrf_token = data.get('leetcode_csrf_token')
+    messages = data['messages']
+    model = data['model']
 
-    if not leetcode_cookie or not leetcode_csrf_token:
-        return jsonify({'error': 'Missing cookie or CSRF token'}), 400
+    return generate(messages, model)
 
-    print(f"Received LeetCode cookie: {leetcode_cookie}")
-    print(f"Received LeetCode CSRF token: {leetcode_csrf_token}")
+@app.route('/abstract', methods=['POST'])
+def abstract():
+    data = request.json
+    text = data['text']
+    model = data['model']
+    conversation = data['messages']
 
-    # In a real application, you might want to store these in a secure way
-    # For example, in an encrypted database or a secure key-value store
-    return jsonify({'message': 'LeetCode authentication info received successfully'}), 200
+    messages = [{'role': 'user', 'content': abstractify_prompt_fn(json.dumps(conversation), text)}]
+    return generate(messages, model)
 
 @app.route('/execute', methods=['POST'])
 def execute_code():
@@ -439,6 +439,22 @@ def execute_code():
         passed = False
 
     return jsonify({'output': output, 'passed': passed})
+
+@app.route('/set-leetcode-auth', methods=['POST'])
+def set_leetcode_auth():
+    data = request.json
+    leetcode_cookie = data.get('leetcode_cookie')
+    leetcode_csrf_token = data.get('leetcode_csrf_token')
+
+    if not leetcode_cookie or not leetcode_csrf_token:
+        return jsonify({'error': 'Missing cookie or CSRF token'}), 400
+
+    print(f"Received LeetCode cookie: {leetcode_cookie}")
+    print(f"Received LeetCode CSRF token: {leetcode_csrf_token}")
+
+    # In a real application, you might want to store these in a secure way
+    # For example, in an encrypted database or a secure key-value store
+    return jsonify({'message': 'LeetCode authentication info received successfully'}), 200
 
 @app.route('/test', methods=['GET'])
 def test():
