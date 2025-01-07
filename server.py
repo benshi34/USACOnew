@@ -349,7 +349,6 @@ class LeetCodeJudge(Judge):
             'judge_output': submission_result
         }
     
-
 def generate(messages, model):
     try:
         if 'gpt' in model:
@@ -379,8 +378,6 @@ def generate(messages, model):
         else:
             return jsonify({"error": error_message}), 500
 
-
-# problem_dict = load_json('data/datasets/usaco_subset307_dict')
 @app.route('/generate', methods=['POST'])
 def generate_response():
     data = request.json
@@ -400,7 +397,7 @@ def abstract():
     return generate(messages, model)
 
 # TODO: only works for CP type input parsing (where we assume input is a good string)
-@app.route('execute-test-case', methods=['POST'])
+@app.route('/execute-test-case', methods=['POST'])
 def execute_single_test_case():
     data = request.json
     code = data.get('code')
