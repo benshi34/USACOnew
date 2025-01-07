@@ -46,6 +46,12 @@ ResultSet = List[Result]
 openai_api_key = os.environ['OPENAI_API_KEY']
 anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
 
+
+FORBIDDEN_PATTERNS = [
+    "import", "exec", "eval", "os.", "sys.", "subprocess", 
+    "open", "file", "__", "globals", "locals"
+]
+
 class ResultType(int, Enum):
     ACCEPTED              = 1
     WRONG_ANSWER          = 2
