@@ -1,10 +1,9 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from coderun_utils import run_code
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-# from USACOBench.evaluation.judges.usaco_judge import USACOJudge
-# from USACOBench.evaluation.judges.leetcode_judge import LeetCodeJudge
 from typing import List, Dict, Any, Union
 from enum import Enum
 from pydantic import BaseModel
@@ -31,6 +30,7 @@ import io
 from datetime import datetime
 import os
 from prompts import abstractify_prompt_fn
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -392,6 +392,58 @@ def abstract():
 
     messages = [{'role': 'user', 'content': abstractify_prompt_fn(json.dumps(conversation), text)}]
     return generate(messages, model)
+
+# TODO: only works for CP type input parsing (where we assume input is a good string)
+@app.route('execute-test-case', methods=['POST'])
+def execute_single_test_case():
+    data = request.json
+    code = data.get('code')
+    input_str = data.get('input')
+    expected_output = data.get('expected_output')
+
+    # Check if required fields are present
+    if not all([code, input_str, expected_output]):
+        return jsonify({
+            'output': 'Error: Missing required fields (code, input, or expected_output)',
+            'passed': False
+        }), 400
+
+    # Validate input string
+    try:
+        # Remove leading/trailing whitespace
+        input_str = input_str.strip()
+        
+        # Check for forbidden patterns
+        for pattern in FORBIDDEN_PATTERNS:
+            if pattern in input_str:
+                return jsonify({
+                    'output': f'Error: Invalid input - contains forbidden pattern: {pattern}',
+                    'passed': False
+                }), 400
+
+        # Only allow alphanumeric characters, spaces, and basic punctuation
+        if not re.match(r'^[\w\s.,\-+]*$', input_str):
+            return jsonify({
+                'output': 'Error: Input can only contain letters, numbers, spaces, and basic punctuation',
+                'passed': False
+            }), 400
+
+    except Exception as e:
+        return jsonify({
+            'output': f'Error validating input: {str(e)}',
+            'passed': False
+        }), 400
+
+    print('Executing!')
+    try:
+        output = jsonify(run_code(code, input_str, expected_output))
+    except Exception as e:
+        output = jsonify({
+            'output': f'Error executing code: {str(e)}',
+            'passed': False
+        })
+
+    return output
 
 @app.route('/execute', methods=['POST'])
 def execute_code():
