@@ -26,6 +26,7 @@ parser.add_argument('-s', '--semantic_retrieval', help='whether to use semantic 
 parser.add_argument('-r', '--reflexion', help='whether to use reflexion', action="store_true", default=False)
 parser.add_argument('-a', '--attempts', help='number of attempts', default=1)
 parser.add_argument('-n', '--num_reflexion', help='number of reflexion iterations', default=2)
+parser.add_argument('-c', '--corpus_path', help='path to corpus', default=None)
 args = parser.parse_args()
 
 model_name = args.model_name
@@ -33,8 +34,10 @@ if 'gpt' in model_name:
     model_fn = gpts
 elif 'claude' in model_name:
     model_fn = claude
+elif 'llama' in model_name.lower() or 'deepseek' in model_name.lower():
+    model_fn = gpts
 else: 
-    raise Exception("Model name not one of gpt or claude. Please modify code to add model support.")
+    raise Exception("Model name not one of gpt, claude, llama or deepseek. Please modify code to add model support.")
 
 problem_dict = load_problem_dict('usaco_subset307')
 model_fn = partial(model_fn, model=model_name)
@@ -66,7 +69,10 @@ elif not args.episodic_retrieval and not args.semantic_retrieval and args.reflex
     rs = calculate_final_rs(reflexions, problem_dict)
 
 elif args.episodic_retrieval and not args.semantic_retrieval and args.reflexion:
-    rdict, sdict, rs, ss = run_solve(model_fn, model_name, problem_dict, args.attempts)
+    if not args.corpus_path:
+        rdict, sdict, rs, ss = run_solve(model_fn, model_name, problem_dict, args.attempts)
+    else:
+        rdict, sdict, rs, ss = load_json(args.corpus_path)
     rdict, sdict, rs, ss = run_retrieval(model_fn, model_name, problem_dict, args.attempts, ss, args.num_retrieved, RetrievalType.EPISODIC)
 
     reflexions = [rdict]

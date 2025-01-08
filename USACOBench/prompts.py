@@ -23,8 +23,7 @@ delimiters, and include exactly one block of code with the entire solution
 Reason through the problem and:
 1. Restate the problem in plain English
 2. Conceptualize a solution first in plain English
-3. Write a pseudocode solution
-4. Output the final Python solution with your solution steps in comments.
+3. Output the final Python solution with your solution steps in comments.
 No outside libraries are allowed.
 
 [BEGIN RETRIEVED TEXT]
@@ -54,13 +53,11 @@ def reflexion_prompt_fn(query, retrieval=False):
 def solve_prompt_fn(query):
     return f"""Please reply with a Python 3 solution to the below problem. Make sure to wrap your code in '```python' and '```' Markdown
 delimiters, and include exactly one block of code with the entire solution
-(in the final code step).
+(in the final code step). Do not use any outside libraries, as we will not be able to run your solution. Also: do not wrap your code in a main function as that causes issues.
 Reason through the problem and:
 1. Restate the problem in plain English
 2. Conceptualize a solution first in plain English
-3. Write a pseudocode solution
-4. Output the final Python solution with your solution steps in comments.
-No outside libraries are allowed.
+3. Output the final Python solution with your solution steps in comments.
 
 [BEGIN PROBLEM]
 {query['problem_description'] }

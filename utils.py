@@ -9,6 +9,12 @@ from rank_bm25 import BM25Okapi
 from evaluate import evaluate_model
 from functools import partial
 import random
+from collections import defaultdict
+import tiktoken
+import os
+from USACOBench.retrievers.retrievers import Retriever
+
+os.environ['TIKTOKEN_CACHE_DIR'] = '/home/qbshi/cache'
 
 Problem = Dict[Any, Any]
 Solution = Dict[str, Union[str, None]]
@@ -19,8 +25,95 @@ ResultSet = List[Result]
 ResultDict = Dict[str, ResultSet]
 Query = Dict[str, str]
 
+# INCLUSIVE
+CP_ID_CUTOFFS = {'2012': 139, '2013': 287, '2014': 438, '2015': 554, '2016': 650, '2017': 746, '2018': 842, '2019': 950, '2020': 1046, '2021': 1142, '2022': 1238, '2023': 1334, '2024': 1430}
+MIN_YEAR = 2012
+MAX_YEAR = 2024
+
 # NOTE: these are technically not thread-safe, although they are up to
 # microsecond approximation due to timestamps
+
+def combine_list_dicts(solution_dict1, solution_dict2):
+    res = dict()
+    for problem_id in solution_dict1:
+        res[problem_id] = solution_dict1[problem_id] + solution_dict2[problem_id]
+    return res
+
+def get_difficulty_dist(rs: ResultSet, problem_dict):
+    '''
+    Takes lists of result sets, returns the difficulty distribution as a tuple.
+    '''
+    bronze, silver, gold, platinum = 0, 0, 0, 0
+    for result_set in rs:
+        if is_correct_set(result_set):
+            result = result_set[0]
+            difficulty = problem_dict[result['problem_id']]['problem_level'].lower()
+            if difficulty == 'bronze':
+                bronze += 1
+            elif difficulty == 'silver':
+                silver += 1
+            elif difficulty == 'gold':
+                gold += 1
+            elif difficulty == 'platinum':
+                platinum += 1
+            else:
+                print(f"DIFFICULTY NOT FOUND ON PROBLEM {result['problem_id']}")
+    
+    return (bronze, silver, gold, platinum)
+
+def get_date_dist(rs: ResultSet, problem_dict, difficulties: set = {'bronze', 'silver', 'gold', 'platinum'}):
+    '''
+    Takes lists of result sets, returns distribution of dates as tuples of (season, number correct).
+    Buckets by season/school year of USACO competitions. 
+    Optional difficulty argument to only display problem of a specific set of difficulties.
+    '''
+    distribution = defaultdict(int)
+    for result_set in rs:
+        curr_problem = problem_dict[result_set[0]['problem_id']]
+        if curr_problem['problem_level'] not in difficulties:
+            continue
+        if is_correct_set(result_set):
+            release_year = get_release_year(curr_problem)
+            distribution[release_year] += 1
+    return distribution
+
+def get_overlap(rs1: ResultSet, rs2: ResultSet): 
+    '''
+    Takes two lists of result sets, return a list of problems that are solved within both result sets
+    '''
+    solved1 = set(get_solved(rs1))
+    solved2 = set(get_solved(rs2))
+    intersection = solved1.intersection(solved2)
+    return list(intersection)
+
+def get_solved(rs):
+    solved = []
+    for result_set in rs:
+        if is_correct_set(result_set):
+            solved.append(result_set[0]['problem_id'])
+    return solved
+
+def is_correct_set(r: ResultSet):
+    for result in r:
+        if is_correct(result):
+            return True
+    return False
+
+def is_correct(r: Result):
+    if 'num_passed' in r and r['num_passed'] == r['num_tests']:
+        return True
+    return False
+
+def get_release_year(problem: Problem):
+    cp_id = problem['cp_id']
+    for year in range(MIN_YEAR, MAX_YEAR+1): 
+        if int(cp_id) <= CP_ID_CUTOFFS[str(year)]:
+            return year
+    return MAX_YEAR
+
+def count_tokens(text: str) -> int:
+    encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
 
 def save_json(obj, path, timestamp=True, verbose=True):
     if timestamp:
@@ -130,6 +223,22 @@ def get_difficulty_performances(full_results, problem_dict, k=1):
 ####################################################################################################
 # Query Generation Functions
 ####################################################################################################
+
+# General Retrieval Function
+def generate_retrieval_queries(p: int, problem_dict: Dict[str, Problem], query_texts: List[tuple[str, str]], retriever: Retriever, loocv=True):
+    # query_texts = (problem_id, text)
+    fin_queries = []
+    for query_text in query_texts:
+        df_result = retriever.retrieve(query_text, num_docs=p)
+        similar_problem_texts = list(df_result['docs'])
+        similar_problem_ids = list(df_result['problem_id'])
+        similar_problem_text = ""
+        words = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
+        for i, text in enumerate(similar_problem_texts):
+            similar_problem_text += f"\n\n {words[i]} problem and solution \n\n" + text 
+        
+        fin_queries.append({'problem_id': query_text[0], 'retrieval_text': '[BEGIN SIMILAR PROBLEMS]\n' + similar_problem_text + '\n[END SIMILAR PROBLEMS]\n', 'retrieval_problem_ids': similar_problem_ids, 'problem_description': problem_dict[query_text[0]]['description']})
+    return fin_queries
 
 # p is the number of problems retrieved
 def generate_episodic_retrieval_queries(p, problem_dict, solution_sets, use_text=True):
@@ -341,7 +450,8 @@ def run_solve(model_fn, model_name, problem_dict, attempts, return_queries=False
         queries.append({'problem_id': problem_id, 'problem_description': problem_dict[problem_id]['description']})
 
     rdict, sdict, rs, ss = evaluate_model(model_fn, solve_prompt_fn, queries=queries, verbose=True, attempts=attempts, problem_ids=list(problem_dict.keys()))
-    save_json([rdict, sdict, rs, ss], f'results/results_{model_name}_solve_{attempts}attempts')
+    model_name_save = model_name.replace('/', '-')
+    save_json([rdict, sdict, rs, ss], f'results/results_{model_name_save}_solve_{attempts}attempts')
     return (rdict, sdict, rs, ss) if not return_queries else (rdict, sdict, rs, ss, queries)
 
 def run_retrieval(model_fn, model_name, problem_dict, attempts, solution_sets, num_retrieved, retrieval_type, return_queries=False, use_text=True):
@@ -354,13 +464,15 @@ def run_retrieval(model_fn, model_name, problem_dict, attempts, solution_sets, n
 
     r_prompt_fn = partial(retrieval_prompt_fn, retrieval_type=retrieval_type)
     rdict, sdict, rs, ss = evaluate_model(model_fn, r_prompt_fn, queries=queries, verbose=True, attempts=attempts, problem_ids=list(problem_dict.keys()))
-    save_json([rdict, sdict, rs, ss], f'results/results_{model_name}_episodic_retrieval_{attempts}attempts')
+    model_name_save = model_name.replace('/', '-')
+    save_json([rdict, sdict, rs, ss], f'results/results_{model_name_save}_episodic_retrieval_{attempts}attempts')
 
     return (rdict, sdict, rs, ss) if not return_queries else (rdict, sdict, rs, ss, queries)
 
 def run_reflexion(model_fn, model_name, problem_dict, attempts, prev_result_dict, prev_solution_dict, prev_queries_dict, iteration, return_queries=True, retrieval=False):
     new_reflexion_queries_dict = generate_reflexion_queries(prev_result_dict, prev_solution_dict, problem_dict, model_name, iteration, prev_queries_dict=prev_queries_dict, retrieval=retrieval)
     rdict, sdict, rs, ss = evaluate_model(model_fn, reflexion_prompt_fn, queries=list(new_reflexion_queries_dict.values()), verbose=True, attempts=attempts)
-    save_json([rdict, sdict, rs, ss], f'results_{model_name}_reflexion_{str(iteration)}iteration')
+    model_name_save = model_name.replace('/', '-')
+    save_json([rdict, sdict, rs, ss], f'results_{model_name_save}_reflexion_{str(iteration)}iteration')
 
     return (rdict, sdict, rs, ss) if not return_queries else (rdict, sdict, rs, ss, new_reflexion_queries_dict)
