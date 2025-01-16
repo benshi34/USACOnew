@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from coderun_utils import run_code
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from typing import List, Dict, Any, Union
 from enum import Enum
@@ -349,26 +349,33 @@ class LeetCodeJudge(Judge):
             'judge_output': submission_result
         }
     
-def generate(messages, model):
+def _generate_core(messages, model, stream=False):
+    """Core generation logic shared between streaming and non-streaming endpoints"""
     try:
         if 'gpt' in model:
-            # Create a new client instance for each request
             client = OpenAI(api_key=openai_api_key)
             response = client.chat.completions.create(
                 model=model,
-                messages=messages
+                messages=messages,
+                stream=stream
             )
-            ai_message = response.choices[0].message.content
-            return jsonify({"message": ai_message}), 200
+            return response
+            
         elif 'claude' in model:
-            ai_message = anthropic.Anthropic(api_key=anthropic_api_key).messages.create(
-                model=model,
-                messages=messages
-            )
-            return jsonify({"message": ai_message}), 200
-        else: 
-            return jsonify({"message": 'Model not supported.'}), 200
-    
+            client = anthropic.Anthropic(api_key=anthropic_api_key)
+            if stream:
+                return client.messages.stream(
+                    model=model,
+                    messages=messages
+                )
+            else:
+                return client.messages.create(
+                    model=model,
+                    messages=messages
+                )
+        else:
+            return None
+            
     except Exception as e:
         error_message = str(e)
         if "Incorrect API key provided" in error_message:
@@ -378,6 +385,40 @@ def generate(messages, model):
         else:
             return jsonify({"error": error_message}), 500
 
+def generate(messages, model):
+    response = _generate_core(messages, model, stream=False)
+    if response is None:
+        return jsonify({"message": 'Model not supported.'}), 200
+        
+    if isinstance(response, tuple):  # Error case
+        return response
+        
+    if 'gpt' in model:
+        return jsonify({"message": response.choices[0].message.content}), 200
+    else:  # claude
+        return jsonify({"message": response.content[0].text}), 200
+
+def generate_streaming(messages, model):
+    response = _generate_core(messages, model, stream=True)
+    if response is None:
+        return jsonify({"message": 'Model not supported.'}), 200
+        
+    if isinstance(response, tuple):  # Error case
+        return response
+        
+    if 'gpt' in model:
+        def generate():
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+    else:  # claude
+        def generate():
+            for chunk in response:
+                if chunk.content:
+                    yield chunk.content[0].text
+                    
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
 @app.route('/generate', methods=['POST'])
 def generate_response():
     data = request.json
@@ -385,6 +426,14 @@ def generate_response():
     model = data['model']
 
     return generate(messages, model)
+
+@app.route('/generate-streaming', methods=['POST'])
+def generate_streaming_response():
+    data = request.json
+    messages = data['messages']
+    model = data['model']
+
+    return generate_streaming(messages, model)
 
 @app.route('/abstract', methods=['POST'])
 def abstract():
