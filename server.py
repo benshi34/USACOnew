@@ -406,16 +406,15 @@ def generate_streaming(messages, model):
     if isinstance(response, tuple):  # Error case
         return response
         
-    if 'gpt' in model:
-        def generate():
+    def generate():
+        if 'gpt' in model:
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-    else:  # claude
-        def generate():
+                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+        else:  # claude
             for chunk in response:
                 if chunk.content:
-                    yield chunk.content[0].text
+                    yield f"data: {chunk.content[0].text}\n\n"
                     
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
@@ -433,7 +432,24 @@ def generate_streaming_response():
     messages = data['messages']
     model = data['model']
 
-    return generate_streaming(messages, model)
+    response = _generate_core(messages, model, stream=True)
+    if response is None:
+        return jsonify({"message": 'Model not supported.'}), 200
+        
+    if isinstance(response, tuple):  # Error case
+        return response
+        
+    def generate():
+        if 'gpt' in model:
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+        else:  # claude
+            for chunk in response:
+                if chunk.content:
+                    yield f"data: {chunk.content[0].text}\n\n"
+                    
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.route('/abstract', methods=['POST'])
 def abstract():
