@@ -97,18 +97,19 @@ class LeetCodeEnv(gym.Env):
     """
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, cooldown=0):
+    def __init__(self, cooldown=0, leetcode_cookie=None, leetcode_csrf_token=None):
         super(LeetCodeEnv, self).__init__()
-        self.__configure_leetcode()
+        self.__configure_leetcode(leetcode_cookie, leetcode_csrf_token)
         self.reward = False
         self.last_run = None
         self.cooldown = cooldown  # To avoid rate limit
 
-    def __configure_leetcode(self):
+    def __configure_leetcode(self, leetcode_cookie=None, leetcode_csrf_token=None):
         configuration = leetcode.Configuration()
-        # From Dev Tools/Application/Cookies/LEETCODE_SESSION
-        leetcode_session = os.environ["LEETCODE_SESSION"]
-        csrf_token = os.environ['CSRF_TOKEN']
+        # Use passed in credentials if available, otherwise fall back to env vars
+        leetcode_session = leetcode_cookie or os.environ.get("LEETCODE_SESSION")
+        csrf_token = leetcode_csrf_token or os.environ.get('CSRF_TOKEN')
+        
         configuration.api_key["x-csrftoken"] = csrf_token
         configuration.api_key["csrftoken"] = csrf_token
         configuration.api_key["LEETCODE_SESSION"] = leetcode_session
@@ -331,16 +332,24 @@ class LeetCodeJudge(Judge):
             }
         return self._leetcode_judge(solution_code, problem_id)
     
-    def _leetcode_judge(self, solution_code: str, question_slug: str):
+    def _leetcode_judge(self, solution_code: str, question_slug: str, leetcode_cookie=None, leetcode_csrf_token=None):
         '''
-        Judges a Python3 Leetcode solution; returns result as a
-            dictionary with status and judge_output strings
-        solution_code: code to submit as a string
-        question_slug: name of the question to judge
+        Judges a Python3 Leetcode solution
         '''
+        # Check for authentication credentials
+        final_cookie = leetcode_cookie or os.environ.get("LEETCODE_SESSION")
+        final_csrf_token = leetcode_csrf_token or os.environ.get('CSRF_TOKEN')
+        
+        if not final_cookie or not final_csrf_token:
+            return {
+                'result_type': ResultType.UNKNOWN,
+                'status': 'LeetCode authentication credentials not found. Please provide valid credentials.',
+                'judge_output': 'Authentication error'
+            }
+        
         lang = ProgrammingLanguage.PYTHON3 if '->' in solution_code else ProgrammingLanguage.PYTHON
         sub = LeetCodeSubmission(code=solution_code, lang=lang, question_slug=question_slug)
-        env = LeetCodeEnv()
+        env = LeetCodeEnv(leetcode_cookie=final_cookie, leetcode_csrf_token=final_csrf_token)
         status, reward, done, submission_result = env.step(sub)
         result_type, status = parse_leetcode_result_type((status, reward, done, submission_result))
         return {
@@ -519,6 +528,8 @@ def execute_code():
     code = data.get('model_output')
     problem_id = data.get('problem_id')
     platform = data.get('platform')
+    leetcode_cookie = data.get('leetcode_cookie')
+    leetcode_csrf_token = data.get('leetcode_csrf_token')
     
     # Clean out the delimiters:
     print('Executing!')
@@ -537,7 +548,7 @@ def execute_code():
         elif platform == 'leetcode':
             judge = LeetCodeJudge()
             print(code)
-            result = judge._leetcode_judge(code, problem_id)
+            result = judge._leetcode_judge(code, problem_id, leetcode_cookie, leetcode_csrf_token)
         
         if result['result_type'] == ResultType.UNKNOWN:
             output = "Error occurred during evaluation."
