@@ -355,7 +355,7 @@ class LeetCodeJudge(Judge):
         return {
             'result_type': result_type,
             'status': status,
-            'judge_output': submission_result
+            'judge_output': submission_result,
         }
     
 def _generate_core(messages, model, stream=False):
@@ -549,6 +549,8 @@ def execute_code():
             judge = LeetCodeJudge()
             print(code)
             result = judge._leetcode_judge(code, problem_id, leetcode_cookie, leetcode_csrf_token)
+        else: 
+            return jsonify({'output': 'Supported Platform Not Detected', 'passed': False})
         
         if result['result_type'] == ResultType.UNKNOWN:
             output = "Error occurred during evaluation."
@@ -569,7 +571,7 @@ def execute_code():
         output = 'Probably Parsing Error: Try Submitting Solution Again. \n' + str(e)
         passed = False
 
-    return jsonify({'output': output, 'passed': passed})
+    return jsonify({'output': output, 'passed': passed, 'judge_output': result['judge_output'] if result['judge_output'] else None})
 
 @app.route('/set-leetcode-auth', methods=['POST'])
 def set_leetcode_auth():
