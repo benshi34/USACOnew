@@ -551,7 +551,10 @@ def execute_code():
             result = judge._leetcode_judge(code, problem_id, leetcode_cookie, leetcode_csrf_token)
         else: 
             return jsonify({'output': 'Supported Platform Not Detected', 'passed': False})
-        
+
+        if not result:
+            return jsonify({'output': 'Result file not founnd', 'passed': False})
+
         if result['result_type'] == ResultType.UNKNOWN:
             output = "Error occurred during evaluation."
             passed = False
