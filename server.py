@@ -531,7 +531,9 @@ def execute_code():
     leetcode_cookie = data.get('leetcode_cookie')
     leetcode_csrf_token = data.get('leetcode_csrf_token')
     
-    # Clean out the delimiters:
+    # Initialize result variable
+    result = None
+    
     print('Executing!')
     
     try:
@@ -574,7 +576,11 @@ def execute_code():
         output = 'Probably Parsing Error: Try Submitting Solution Again. \n' + str(e)
         passed = False
 
-    return jsonify({'output': output, 'passed': passed, 'judge_output': result['judge_output'] if result['judge_output'] else None})
+    return jsonify({
+        'output': output, 
+        'passed': passed, 
+        'judge_output': result['judge_output'] if result and result.get('judge_output') else None
+    })
 
 @app.route('/set-leetcode-auth', methods=['POST'])
 def set_leetcode_auth():
