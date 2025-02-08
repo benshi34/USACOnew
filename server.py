@@ -12,6 +12,7 @@ import ast
 import dotenv
 import gym
 import leetcode
+from together import Together
 from tqdm import tqdm
 from openai import OpenAI
 import anthropic
@@ -45,6 +46,8 @@ ResultSet = List[Result]
 
 openai_api_key = os.environ['OPENAI_API_KEY']
 anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
+deepseek_api_key = os.environ['DEEPSEEK_API_KEY']
+together_api_key = os.environ['TOGETHER_API_KEY']
 
 
 FORBIDDEN_PATTERNS = [
@@ -382,8 +385,22 @@ def _generate_core(messages, model, stream=False):
                     model=model,
                     messages=messages
                 )
+        elif 'deepseek' in model:
+            client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=stream
+            )
+            return response
         else:
-            return None
+            client = Together(api_key=together_api_key)
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=stream
+            )
+            return response
             
     except Exception as e:
         error_message = str(e)
