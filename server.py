@@ -419,10 +419,10 @@ def generate(messages, model):
     if isinstance(response, tuple):  # Error case
         return response
         
-    if 'gpt' in model:
-        return jsonify({"message": response.choices[0].message.content}), 200
-    else:  # claude
+    if 'claude' in model:
         return jsonify({"message": response.content[0].text}), 200
+    else:
+        return jsonify({"message": response.choices[0].message.content}), 200
 
 def generate_streaming(messages, model):
     response = _generate_core(messages, model, stream=True)
@@ -433,14 +433,15 @@ def generate_streaming(messages, model):
         return response
         
     def generate():
-        if 'gpt' in model:
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    yield f"data: {chunk.choices[0].delta.content}\n\n"
-        else:  # claude
+        if 'claude' in model:
             for chunk in response:
                 if chunk.content:
                     yield f"data: {chunk.content[0].text}\n\n"
+        else:
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+
                     
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
@@ -466,14 +467,15 @@ def generate_streaming_response():
         return response
         
     def generate():
-        if 'gpt' in model:
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    yield f"data: {chunk.choices[0].delta.content}\n\n"
-        else:  # claude
+        if 'claude' in model:# claude
             for chunk in response:
                 if chunk.content:
                     yield f"data: {chunk.content[0].text}\n\n"
+        else:
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+
                     
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
