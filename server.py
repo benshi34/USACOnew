@@ -364,7 +364,7 @@ class LeetCodeJudge(Judge):
 def _generate_core(messages, model, stream=False):
     """Core generation logic shared between streaming and non-streaming endpoints"""
     try:
-        if 'gpt' in model:
+        if 'gpt' in model or 'o1' in model or 'o3' in model:
             client = OpenAI(api_key=openai_api_key)
             response = client.chat.completions.create(
                 model=model,
@@ -375,15 +375,25 @@ def _generate_core(messages, model, stream=False):
             
         elif 'claude' in model:
             client = anthropic.Anthropic(api_key=anthropic_api_key)
+            # Convert messages to Anthropic format
+            anthropic_messages = [
+                {
+                    "role": msg["role"],
+                    "content": [{"type": "text", "text": msg["content"]}]
+                }
+                for msg in messages
+            ]
             if stream:
                 return client.messages.stream(
                     model=model,
-                    messages=messages
+                    messages=anthropic_messages,
+                    max_tokens=4096
                 )
             else:
                 return client.messages.create(
                     model=model,
-                    messages=messages
+                    messages=anthropic_messages,
+                    max_tokens=4096
                 )
         elif 'deepseek' in model:
             client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
@@ -435,8 +445,8 @@ def generate_streaming(messages, model):
     def generate():
         if 'claude' in model:
             for chunk in response:
-                if chunk.content:
-                    yield f"data: {chunk.content[0].text}\n\n"
+                if chunk.delta.text:  # Changed from chunk.content to chunk.delta.text
+                    yield f"data: {chunk.delta.text}\n\n"
         else:
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
