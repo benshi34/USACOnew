@@ -12,7 +12,7 @@ import ast
 import dotenv
 import gym
 import leetcode
-from together import Together
+# from together import Together
 from tqdm import tqdm
 from openai import OpenAI
 import anthropic
@@ -393,14 +393,14 @@ def _generate_core(messages, model, stream=False):
                 stream=stream
             )
             return response
-        else:
-            client = Together(api_key=together_api_key)
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=stream
-            )
-            return response
+        # else:
+        #     client = Together(api_key=together_api_key)
+        #     response = client.chat.completions.create(
+        #         model=model,
+        #         messages=messages,
+        #         stream=stream
+        #     )
+        #     return response
             
     except Exception as e:
         error_message = str(e)
