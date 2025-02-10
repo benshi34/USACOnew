@@ -366,12 +366,11 @@ def _generate_core(messages, model, stream=False):
     try:
         if 'gpt' in model or 'o1' in model or 'o3' in model:
             client = OpenAI(api_key=openai_api_key)
-            response = client.chat.completions.create(
+            return client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=stream
             )
-            return response
             
         elif 'claude' in model:
             client = anthropic.Anthropic(api_key=anthropic_api_key)
@@ -397,7 +396,7 @@ def _generate_core(messages, model, stream=False):
                 )
         elif 'deepseek' in model:
             client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
-            response = client.chat.completions.create(
+            return client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=stream
@@ -421,11 +420,17 @@ def _generate_core(messages, model, stream=False):
         else:
             return jsonify({"error": error_message}), 500
 
-def generate(messages, model):
+@app.route('/generate', methods=['POST'])
+def generate():
+    """Non-streaming generation endpoint"""
+    data = request.json
+    messages = data['messages']
+    model = data['model']
+
     response = _generate_core(messages, model, stream=False)
+    
     if response is None:
         return jsonify({"message": 'Model not supported.'}), 200
-        
     if isinstance(response, tuple):  # Error case
         return response
         
@@ -434,50 +439,22 @@ def generate(messages, model):
     else:
         return jsonify({"message": response.choices[0].message.content}), 200
 
-def generate_streaming(messages, model):
-    response = _generate_core(messages, model, stream=True)
-    if response is None:
-        return jsonify({"message": 'Model not supported.'}), 200
-        
-    if isinstance(response, tuple):  # Error case
-        return response
-        
-    def generate():
-        if 'claude' in model:
-            for chunk in response:
-                if chunk.delta.text:  # Changed from chunk.content to chunk.delta.text
-                    yield f"data: {chunk.delta.text}\n\n"
-        else:
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    yield f"data: {chunk.choices[0].delta.content}\n\n"
-
-                    
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
-
-@app.route('/generate', methods=['POST'])
-def generate_response():
-    data = request.json
-    messages = data['messages']
-    model = data['model']
-
-    return generate(messages, model)
-
 @app.route('/generate-streaming', methods=['POST'])
-def generate_streaming_response():
+def generate_streaming():
+    """Streaming generation endpoint"""
     data = request.json
     messages = data['messages']
     model = data['model']
 
     response = _generate_core(messages, model, stream=True)
+    
     if response is None:
         return jsonify({"message": 'Model not supported.'}), 200
-        
     if isinstance(response, tuple):  # Error case
         return response
-        
-    def generate():
-        if 'claude' in model:# claude
+
+    def stream():
+        if 'claude' in model:
             for chunk in response:
                 if chunk.content:
                     yield f"data: {chunk.content[0].text}\n\n"
@@ -486,8 +463,7 @@ def generate_streaming_response():
                 if chunk.choices[0].delta.content is not None:
                     yield f"data: {chunk.choices[0].delta.content}\n\n"
 
-                    
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+    return Response(stream_with_context(stream()), mimetype='text/event-stream')
 
 @app.route('/abstract', methods=['POST'])
 def abstract():
