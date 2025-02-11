@@ -382,17 +382,24 @@ def _generate_core(messages, model, stream=False):
                 }
                 for msg in messages
             ]
+            system_message = ""
+            if anthropic_messages[0]["role"].lower() == "system":
+                system_message = anthropic_messages[0]['content']
+                anthropic_messages = anthropic_messages[1:]
+
             if stream:
                 return client.messages.stream(
                     model=model,
                     messages=anthropic_messages,
-                    max_tokens=4096
+                    max_tokens=4096,
+                    system=system_message
                 )
             else:
                 return client.messages.create(
                     model=model,
                     messages=anthropic_messages,
-                    max_tokens=4096
+                    max_tokens=4096,
+                    system=system_message
                 )
         elif 'deepseek' in model:
             client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
