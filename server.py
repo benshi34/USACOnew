@@ -23,6 +23,7 @@ import os
 import time
 from datetime import datetime
 from abc import ABC
+from google import genai
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -48,6 +49,7 @@ openai_api_key = os.environ['OPENAI_API_KEY']
 anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
 deepseek_api_key = os.environ['DEEPSEEK_API_KEY']
 together_api_key = os.environ['TOGETHER_API_KEY']
+gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
 
 
 FORBIDDEN_PATTERNS = [
@@ -371,7 +373,29 @@ def _generate_core(messages, model, stream=False):
                 messages=messages,
                 stream=stream
             )
+        elif 'gemini' in model:
+            client = genai.Client(api_key=gemini_api_key)
+            # Convert messages to Gemini format
+            gemini_messages = []
             
+            # Convert messages to Gemini format with proper parts structure
+            for msg in messages:
+                role = "model" if msg["role"] == "assistant" else msg["role"]
+                if role == "system":
+                    continue  # Skip system message for now as we'll handle it separately
+                gemini_message = {
+                    "role": role,
+                    "parts": [{"text": msg["content"]}]
+                }
+                gemini_messages.append(gemini_message)
+            
+            # Generate content with full conversation history
+            response = client.models.generate_content(
+                model=model,
+                contents=gemini_messages,
+                systemInstruction= {"role": "model", "parts": [{"text": messages[0]["content"]}]},
+            )
+            return response
         elif 'claude' in model:
             client = anthropic.Anthropic(api_key=anthropic_api_key)
             # Convert messages to Anthropic format
@@ -443,6 +467,8 @@ def generate():
         
     if 'claude' in model:
         return jsonify({"message": response.content[0].text}), 200
+    elif 'gemini' in model:
+        return jsonify({"message": response.text}), 200
     else:
         return jsonify({"message": response.choices[0].message.content}), 200
 
