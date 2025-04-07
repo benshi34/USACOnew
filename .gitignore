@@ -11,6 +11,7 @@ __pycache__/
 results/
 results_trashed/
 queries/
+test.py
 
 **.slurm
 **.sh

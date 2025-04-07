@@ -12,7 +12,7 @@ import ast
 import dotenv
 import gym
 import leetcode
-# from together import Together
+from together import Together
 from tqdm import tqdm
 from openai import OpenAI
 import anthropic
@@ -45,11 +45,11 @@ SolutionSet = List[Solution]
 Result = Dict[str, str]
 ResultSet = List[Result]
 
-openai_api_key = os.environ['OPENAI_API_KEY']
-anthropic_api_key = os.environ['ANTHROPIC_API_KEY']
-deepseek_api_key = os.environ['DEEPSEEK_API_KEY']
-together_api_key = os.environ['TOGETHER_API_KEY']
-gemini_api_key = os.environ.get('GEMINI_API_KEY', '')
+openai_api_key = os.environ.get('OPENAI_API_KEY')
+anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
+deepseek_api_key = os.environ.get('DEEPSEEK_API_KEY')
+together_api_key = os.environ.get('TOGETHER_API_KEY')
+gemini_api_key = os.environ.get('GEMINI_API_KEY')
 
 
 FORBIDDEN_PATTERNS = [
@@ -365,8 +365,13 @@ class LeetCodeJudge(Judge):
     
 def _generate_core(messages, model, stream=False):
     """Core generation logic shared between streaming and non-streaming endpoints"""
+    if not any([openai_api_key, anthropic_api_key, deepseek_api_key, gemini_api_key]):
+        return jsonify({"error": "No API keys configured"}), 500
+        
     try:
         if 'gpt' in model or 'o1' in model or 'o3' in model:
+            if not openai_api_key:
+                return jsonify({"error": "OpenAI API key not configured"}), 500
             client = OpenAI(api_key=openai_api_key)
             return client.chat.completions.create(
                 model=model,
@@ -374,6 +379,8 @@ def _generate_core(messages, model, stream=False):
                 stream=stream
             )
         elif 'gemini' in model:
+            if not gemini_api_key:
+                return jsonify({"error": "Gemini API key not configured"}), 500
             client = genai.Client(api_key=gemini_api_key)
             # Convert messages to Gemini format
             gemini_messages = []
@@ -397,6 +404,8 @@ def _generate_core(messages, model, stream=False):
             )
             return response
         elif 'claude' in model:
+            if not anthropic_api_key:
+                return jsonify({"error": "Anthropic API key not configured"}), 500
             client = anthropic.Anthropic(api_key=anthropic_api_key)
             # Convert messages to Anthropic format
             anthropic_messages = [
@@ -426,13 +435,22 @@ def _generate_core(messages, model, stream=False):
                     system=system_message
                 )
         elif 'deepseek' in model:
+            if not deepseek_api_key:
+                return jsonify({"error": "Deepseek API key not configured"}), 500
             client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
             return client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=stream
             )
-            return response
+        elif 'llama' in model:
+            if not together_api_key:
+                return jsonify({"error": "Together API key not configured"}), 500
+            client = Together(api_key=together_api_key)
+            return client.chat.completions.create(
+                model=model,
+                messages=messages,
+            )
         # else:
         #     client = Together(api_key=together_api_key)
         #     response = client.chat.completions.create(
@@ -449,12 +467,17 @@ def _generate_core(messages, model, stream=False):
         elif "Rate limit reached" in error_message:
             return jsonify({"error": "Rate limit exceeded"}), 429
         else:
-            return jsonify({"error": error_message}), 500
+            return jsonify({"error": f"Unexpected error: {error_message}"}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate():
     """Non-streaming generation endpoint"""
     data = request.json
+    
+    # Check for required fields
+    if not data or 'messages' not in data or 'model' not in data:
+        return jsonify({"error": "Missing required fields: 'messages' and 'model' are required"}), 400
+        
     messages = data['messages']
     model = data['model']
 
