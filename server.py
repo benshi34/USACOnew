@@ -602,12 +602,8 @@ def execute_code():
         code = code.strip().replace('```Python', "").replace('```', "").replace('```python', "")
         assert code[0] != '`' and code[-1] != '`'
         if platform == 'usaco':
-            # assert problem_id in problem_dict
             return jsonify({'output': 'USACO not supported at the moment.', 'passed': False})
 
-        # if platform == 'usaco':
-        #     judge = USACOJudge()
-        #     result = judge._judge(problem_dict[problem_id], code, save_solution=False, mode='eval_all')
         elif platform == 'leetcode':
             judge = LeetCodeJudge()
             print(code)
@@ -616,7 +612,7 @@ def execute_code():
             return jsonify({'output': 'Supported Platform Not Detected', 'passed': False})
 
         if not result:
-            return jsonify({'output': 'Result file not founnd', 'passed': False})
+            return jsonify({'output': 'Result file not found', 'passed': False})
 
         if result['result_type'] == ResultType.UNKNOWN:
             output = "Error occurred during evaluation."
@@ -633,13 +629,17 @@ def execute_code():
                 output = f"Evaluation Results: \n"
                 output += result['status']
                 passed = True if result['result_type'] == ResultType.ACCEPTED else False
+    except AssertionError as e:
+        output = f'Code parsing error: Invalid code format. Please ensure code is properly formatted without extra backticks.'
+        passed = False
     except Exception as e:
-        output = 'Probably Parsing Error: Try Submitting Solution Again. \n' + str(e)
+        output = f'Error during execution: {str(e)}\nError type: {type(e).__name__}'
         passed = False
 
     return jsonify({
         'output': output, 
         'passed': passed, 
+        'error_type': type(e).__name__ if 'e' in locals() else None,
         'judge_output': result['judge_output'] if result and result.get('judge_output') else None
     })
 
