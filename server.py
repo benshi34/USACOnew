@@ -431,6 +431,8 @@ def _generate_core(messages, model, stream=False):
             if not together_api_key:
                 return jsonify({"error": "Together API key not configured"}), 500
             client = Together(api_key=together_api_key)
+            if 'deepseek-r1' in model.lower():
+                messages.insert(0, {"role": "system", "content": "Do not think for too long as you will keep the user waiting. However, your response still be detailed, explanatory, and helpful."})
             return client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -474,6 +476,11 @@ def generate():
         
     if 'claude' in model:
         return jsonify({"message": response.content[0].text}), 200
+    elif 'deepseek-r1' in model.lower():
+        content = response.choices[0].message.content
+        # Remove all <think>...</think> blocks using regex
+        filtered_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+        return jsonify({"message": filtered_content.strip()}), 200
     else:
         return jsonify({"message": response.choices[0].message.content}), 200
 
