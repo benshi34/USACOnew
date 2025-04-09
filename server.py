@@ -432,7 +432,7 @@ def _generate_core(messages, model, stream=False):
                 return jsonify({"error": "Together API key not configured"}), 500
             client = Together(api_key=together_api_key)
             if 'deepseek-r1' in model.lower():
-                messages.insert(0, {"role": "system", "content": "Do not think for too long as you will keep the user waiting. However, your response still be detailed, explanatory, and helpful."})
+                messages.insert(0, {"role": "system", "content": "Do not think for more than 500 words. However, your response still be detailed, explanatory, and helpful."})
             return client.chat.completions.create(
                 model=model,
                 messages=messages,
