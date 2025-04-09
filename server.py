@@ -418,16 +418,16 @@ def _generate_core(messages, model, stream=False):
                     max_tokens=4096,
                     system=system_message
                 )
-        elif 'deepseek' in model:
-            if not deepseek_api_key:
-                return jsonify({"error": "Deepseek API key not configured"}), 500
-            client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
-            return client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=stream
-            )
-        elif 'llama' in model:
+        # elif 'deepseek-chat' or 'deepseek-reasoner' in model:
+        #     if not deepseek_api_key:
+        #         return jsonify({"error": "Deepseek API key not configured"}), 500
+        #     client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+        #     return client.chat.completions.create(
+        #         model=model,
+        #         messages=messages,
+        #         stream=stream
+        #     )
+        elif 'llama' or 'deepseek-ai/' in model:
             if not together_api_key:
                 return jsonify({"error": "Together API key not configured"}), 500
             client = Together(api_key=together_api_key)
@@ -443,7 +443,7 @@ def _generate_core(messages, model, stream=False):
         #         stream=stream
         #     )
         #     return response
-            
+
     except Exception as e:
         error_message = str(e)
         if "Incorrect API key provided" in error_message:
