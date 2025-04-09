@@ -431,8 +431,8 @@ def _generate_core(messages, model, stream=False):
             if not together_api_key:
                 return jsonify({"error": "Together API key not configured"}), 500
             client = Together(api_key=together_api_key)
-            if 'deepseek-r1' in model.lower():
-                messages.insert(0, {"role": "system", "content": "Do not think for more than 500 words. However, your response still be detailed, explanatory, and helpful."})
+            # if 'deepseek-r1' in model.lower():
+            #     messages.insert(0, {"role": "system", "content": "Do not think for more than 500 words. However, your response still be detailed, explanatory, and helpful."})
             return client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -675,11 +675,12 @@ def upload_chat():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
             
-        required_fields = ['userId', 'problemId', 'modelId', 'timestamp', 'messages']
+        # Update required fields to match new data structure
+        required_fields = ['userId', 'problemId', 'modelId', 'modelDisplayName', 'timestamp', 'messages', 'chatStatus', 'timer']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Create filename
+        # Create filename with timestamp
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{data['userId']}_{data['problemId']}_{data['modelId']}_{timestamp}.json"
 
@@ -689,16 +690,20 @@ def upload_chat():
         # Prepare file metadata
         file_metadata = {
             'name': filename,
-            'parents': [os.environ.get('GOOGLE_DRIVE_FOLDER_ID')]  # Your folder ID
+            'parents': [os.environ.get('GOOGLE_DRIVE_FOLDER_ID')]
         }
 
-        # Convert data to JSON string
+        # Convert data to JSON string - now including all new fields
         file_content = json.dumps({
             'userId': data['userId'],
             'problemId': data['problemId'],
             'modelId': data['modelId'],
+            'modelDisplayName': data['modelDisplayName'],
             'timestamp': data['timestamp'],
-            'messages': data['messages']
+            'messages': data['messages'],
+            'chatStatus': data['chatStatus'],
+            'timer': data['timer'],
+            'surveyData': data.get('surveyData', {})  # Include survey data if present
         }, indent=2)
 
         # Create file stream
