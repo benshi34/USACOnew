@@ -16,6 +16,7 @@ class TestGenerateEndpoints(unittest.TestCase):
             # "deepseek-chat",
             # "deepseek-reasoner",
             # "o1-2024-12-17",
+            "gemini-2.5-pro-preview-03-25",
             "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
         ]
 

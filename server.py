@@ -381,28 +381,12 @@ def _generate_core(messages, model, stream=False):
         elif 'gemini' in model:
             if not gemini_api_key:
                 return jsonify({"error": "Gemini API key not configured"}), 500
-            client = genai.Client(api_key=gemini_api_key)
-            # Convert messages to Gemini format
-            gemini_messages = []
-            
-            # Convert messages to Gemini format with proper parts structure
-            for msg in messages:
-                role = "model" if msg["role"] == "assistant" else msg["role"]
-                if role == "system":
-                    continue  # Skip system message for now as we'll handle it separately
-                gemini_message = {
-                    "role": role,
-                    "parts": [{"text": msg["content"]}]
-                }
-                gemini_messages.append(gemini_message)
-            
-            # Generate content with full conversation history
-            response = client.models.generate_content(
+            client = OpenAI(api_key=gemini_api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+            return client.chat.completions.create(
                 model=model,
-                contents=gemini_messages,
-                systemInstruction= {"role": "model", "parts": [{"text": messages[0]["content"]}]},
+                messages=messages,
+                stream=stream
             )
-            return response
         elif 'claude' in model:
             if not anthropic_api_key:
                 return jsonify({"error": "Anthropic API key not configured"}), 500
@@ -490,8 +474,6 @@ def generate():
         
     if 'claude' in model:
         return jsonify({"message": response.content[0].text}), 200
-    elif 'gemini' in model:
-        return jsonify({"message": response.text}), 200
     else:
         return jsonify({"message": response.choices[0].message.content}), 200
 
