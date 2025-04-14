@@ -392,16 +392,17 @@ def _generate_core(messages, model, stream=False):
                 return jsonify({"error": "Anthropic API key not configured"}), 500
             client = anthropic.Anthropic(api_key=anthropic_api_key)
             # Convert messages to Anthropic format
-            anthropic_messages = [
-                {
-                    "role": msg["role"],
-                    "content": [{"type": "text", "text": msg["content"]}]
-                }
-                for msg in messages
-            ]
+            # anthropic_messages = [
+            #     {
+            #         "role": msg["role"],
+            #         "content": [{"type": "text", "text": msg["content"]}]
+            #     }
+            #     for msg in messages
+            # ]
+            anthropic_messages = messages
             system_message = ""
             if anthropic_messages[0]["role"].lower() == "system":
-                system_message = anthropic_messages[0]['content']
+                system_message = anthropic_messages[0]['content']  # Extract the text content
                 anthropic_messages = anthropic_messages[1:]
 
             if stream:
@@ -431,11 +432,10 @@ def _generate_core(messages, model, stream=False):
             if not together_api_key:
                 return jsonify({"error": "Together API key not configured"}), 500
             client = Together(api_key=together_api_key)
-            # if 'deepseek-r1' in model.lower():
-            #     messages.insert(0, {"role": "system", "content": "Do not think for more than 500 words. However, your response still be detailed, explanatory, and helpful."})
             return client.chat.completions.create(
                 model=model,
                 messages=messages,
+                stream=stream
             )
         # else:
         #     client = Together(api_key=together_api_key)
@@ -488,6 +488,11 @@ def generate():
 def generate_streaming():
     """Streaming generation endpoint"""
     data = request.json
+    
+    # Check for required fields
+    if not data or 'messages' not in data or 'model' not in data:
+        return jsonify({"error": "Missing required fields: 'messages' and 'model' are required"}), 400
+        
     messages = data['messages']
     model = data['model']
 
@@ -500,9 +505,22 @@ def generate_streaming():
 
     def stream():
         if 'claude' in model:
+            # Yield each part as an SSE event
+            with response as stream:
+                print("Starting Claude stream")
+                for chunk in stream:
+                    print(f"Received chunk: {chunk}")
+                    if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text'):
+                        text = chunk.delta.text
+                        if text:
+                            print(f"Sending text: {text}")
+                            yield f"data: {text}\n\n"
+        elif 'llama' in model or 'deepseek-ai/' in model:
             for chunk in response:
-                if chunk.content:
-                    yield f"data: {chunk.content[0].text}\n\n"
+                if hasattr(chunk, 'choices') and chunk.choices and hasattr(chunk.choices[0], 'delta'):
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content is not None:
+                        yield f"data: {delta.content}\n\n"
         else:
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
