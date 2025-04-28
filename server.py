@@ -716,6 +716,7 @@ def upload_chat():
             'userId': data['userId'],
             'problemId': data['problemId'],
             'modelId': data['modelId'],
+            'currentElo': data.get('currentElo', ''),
             'modelDisplayName': data['modelDisplayName'],
             'timestamp': data['timestamp'],
             'messages': data['messages'],
