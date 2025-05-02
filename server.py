@@ -107,7 +107,21 @@ class LeetCodeEnv(gym.Env):
         self.__configure_leetcode(leetcode_cookie, leetcode_csrf_token)
         self.reward = False
         self.last_run = None
-        self.cooldown = cooldown  # To avoid rate limit
+        self.cooldown = cooldown
+        # Add cleanup flag
+        self._is_closed = False
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        """Cleanup method to ensure proper thread termination"""
+        if not self._is_closed:
+            if hasattr(self, 'api_instance'):
+                # Close any open connections
+                if hasattr(self.api_instance.api_client, 'close'):
+                    self.api_instance.api_client.close()
+            self._is_closed = True
 
     def __configure_leetcode(self, leetcode_cookie=None, leetcode_csrf_token=None):
         configuration = leetcode.Configuration()
@@ -123,21 +137,15 @@ class LeetCodeEnv(gym.Env):
         self.api_instance = leetcode.DefaultApi(leetcode.ApiClient(configuration))
 
     def step(self, action: LeetCodeSubmission):
-        """
-        Sends a submission to LeetCode and returns the result
-        Args:
-            action (LeetCodeSubmission): LeetCodeSubmission object
-        Returns:
-            status (str): 'Accepted' | 'Runtime Error'| 'Wrong Answer' | 'Submission Timed-Out' | 'Unknown'
-            reward (bool): True if status is 'Accepted', False otherwise
-            done (bool): True if status is 'Accepted', False otherwise
-            submission_result (dict): LeetCode API response
-        """
-        submission_result = self.__send_submission(action)
-        reward, status = self.__calculate_reward(submission_result)
-        self.reward = reward
-        done = self.is_done()
-        return status, reward, done, submission_result
+        try:
+            submission_result = self.__send_submission(action)
+            reward, status = self.__calculate_reward(submission_result)
+            self.reward = reward
+            done = self.is_done()
+            return status, reward, done, submission_result
+        finally:
+            # Ensure we clean up after each step
+            self.close()
     
     def reset(self):
         self.reward = False
@@ -338,30 +346,38 @@ class LeetCodeJudge(Judge):
         return self._leetcode_judge(solution_code, problem_id)
     
     def _leetcode_judge(self, solution_code: str, question_slug: str, leetcode_cookie=None, leetcode_csrf_token=None):
-        '''
-        Judges a Python3 Leetcode solution
-        '''
-        # Check for authentication credentials
-        final_cookie = leetcode_cookie or os.environ.get("LEETCODE_SESSION")
-        final_csrf_token = leetcode_csrf_token or os.environ.get('CSRF_TOKEN')
-        
-        if not final_cookie or not final_csrf_token:
+        try:
+            # Check for authentication credentials
+            final_cookie = leetcode_cookie or os.environ.get("LEETCODE_SESSION")
+            final_csrf_token = leetcode_csrf_token or os.environ.get('CSRF_TOKEN')
+            
+            if not final_cookie or not final_csrf_token:
+                return {
+                    'result_type': ResultType.UNKNOWN,
+                    'status': 'LeetCode authentication credentials not found. Please provide valid credentials.',
+                    'judge_output': 'Authentication error'
+                }
+            
+            lang = ProgrammingLanguage.PYTHON3 if '->' in solution_code else ProgrammingLanguage.PYTHON
+            sub = LeetCodeSubmission(code=solution_code, lang=lang, question_slug=question_slug)
+            env = LeetCodeEnv(leetcode_cookie=final_cookie, leetcode_csrf_token=final_csrf_token)
+            try:
+                status, reward, done, submission_result = env.step(sub)
+                result_type, status = parse_leetcode_result_type((status, reward, done, submission_result))
+                return {
+                    'result_type': result_type,
+                    'status': status,
+                    'judge_output': submission_result,
+                }
+            finally:
+                # Ensure environment is properly closed
+                env.close()
+        except Exception as e:
             return {
                 'result_type': ResultType.UNKNOWN,
-                'status': 'LeetCode authentication credentials not found. Please provide valid credentials.',
-                'judge_output': 'Authentication error'
+                'status': f'Error during execution: {str(e)}',
+                'judge_output': None,
             }
-        
-        lang = ProgrammingLanguage.PYTHON3 if '->' in solution_code else ProgrammingLanguage.PYTHON
-        sub = LeetCodeSubmission(code=solution_code, lang=lang, question_slug=question_slug)
-        env = LeetCodeEnv(leetcode_cookie=final_cookie, leetcode_csrf_token=final_csrf_token)
-        status, reward, done, submission_result = env.step(sub)
-        result_type, status = parse_leetcode_result_type((status, reward, done, submission_result))
-        return {
-            'result_type': result_type,
-            'status': status,
-            'judge_output': submission_result,
-        }
     
 def _generate_core(messages, model, stream=False):
     """Core generation logic shared between streaming and non-streaming endpoints"""
